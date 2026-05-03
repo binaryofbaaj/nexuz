@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS // v0.7.3</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050508;
+            --fg: #e2e2ee;
+            --muted: #666680;
+            --accent: #00f2ff;
+            --accent2: #ff007a;
+            --card: rgba(10, 10, 15, 0.7);
+            --border: rgba(255, 255, 255, 0.1);
+            --border-glow: rgba(0, 242, 255, 0.3);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
+            --font-main: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'Space Mono', monospace;
+            --vignette-opacity: 0.4;
+            --thumb-border: #fff;
+            --text-glow: rgba(0, 242, 255, 0.4);
+            --btn-active-bg: var(--accent);
+            --btn-active-fg: #000;
+        }
+
+        [data-theme="light"] {
+            --bg: #fcfcfd;
+            --fg: #050510;
+            --muted: #4a4a6a;
+            --accent: #005c47;
+            --accent2: #9a1a2a;
+            --card: rgba(255, 255, 255, 0.85);
+            --border: rgba(0, 0, 0, 0.12);
+            --border-glow: rgba(0, 92, 71, 0.3);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+            --vignette-opacity: 0.1;
+            --thumb-bg: #000;
+            --thumb-border: #fff;
+            --text-glow: transparent;
+            --btn-active-bg: #050510;
+            --btn-active-fg: #fff;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            background: var(--bg); color: var(--fg);
+            font-family: var(--font-main);
+            overflow: hidden; width: 100vw; height: 100vh; cursor: crosshair;
+        }
+        #canvas-container { position: fixed; inset: 0; z-index: 1; }
+        canvas { display: block; }
+
+        .color-wash {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background: radial-gradient(circle at 50% 50%, var(--accent) 0%, transparent 70%);
+            opacity: 0.02; transition: opacity 0.8s ease, background 0.8s ease;
+        }
+        .color-wash.pulse { opacity: 0.1; }
+
+        .vignette {
+            position: fixed; inset: 0; z-index: 2; pointer-events: none;
+            background: radial-gradient(circle at center, transparent 30%, rgba(0,0,0,var(--vignette-opacity)) 100%);
+            transition: background 0.6s ease;
+        }
+        .noise {
+            position: fixed; inset: 0; z-index: 3; pointer-events: none; opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            background-size: 256px 256px;
+        }
+
+        .hud { position: fixed; inset: 0; z-index: 10; pointer-events: none; font-family: var(--font-mono); }
+        .hud-corner { position: absolute; width: 40px; height: 40px; }
+        .hud-corner::before, .hud-corner::after { content:''; position:absolute; background:var(--accent); opacity:0.3; transition: background 0.4s, opacity 0.4s; }
+        .hud-corner.tl { top:20px; left:20px; }
+        .hud-corner.tl::before { top:0;left:0;width:20px;height:1px; }
+        .hud-corner.tl::after  { top:0;left:0;width:1px;height:20px; }
+        .hud-corner.tr { top:20px; right:20px; }
+        .hud-corner.tr::before { top:0;right:0;width:20px;height:1px; }
+        .hud-corner.tr::after  { top:0;right:0;width:1px;height:20px; }
+        .hud-corner.bl { bottom:20px; left:20px; }
+        .hud-corner.bl::before { bottom:0;left:0;width:20px;height:1px; }
+        .hud-corner.bl::after  { bottom:0;left:0;width:1px;height:20px; }
+        .hud-corner.br { bottom:20px; right:20px; }
+        .hud-corner.br::before { bottom:0;right:0;width:20px;height:1px; }
+        .hud-corner.br::after  { bottom:0;right:0;width:1px;height:20px; }
+
+        .hud-corner:hover::before, .hud-corner:hover::after { opacity: 0.8; background: var(--accent2); }
+
+        .hud-tl { position:absolute; top:35px; left:35px; }
+        .hud-title {
+            font-size:11px; font-weight:700; letter-spacing:5px; color:var(--accent);
+            display:flex; align-items:center; gap:10px; margin-bottom:6px; transition: color 0.4s;
+            text-shadow: 0 0 10px var(--text-glow);
+        }
+        .hud-title .dot {
+            width:6px; height:6px; background:var(--accent); border-radius:1px;
+            animation: scanPulse 2s ease-in-out infinite; transition: background 0.4s;
+        }
+        @keyframes scanPulse { 0%,100%{opacity:1; transform: scale(1);} 50%{opacity:0.3; transform: scale(0.8);} }
+        .hud-subtitle { font-size:8px; letter-spacing:3px; color:var(--muted); text-transform:uppercase; }
+
+        .hud-tr { position:absolute; top:35px; right:35px; text-align:right; }
+        .hud-stat { font-size:8px; letter-spacing:2px; color:var(--muted); margin-bottom:4px; }
+        .hud-stat .val { color:var(--fg); font-weight:700; }
+
+        .hud-bl { position:absolute; bottom:35px; left:35px; }
+        .hud-coords { font-size:8px; letter-spacing:2px; color:var(--muted); }
+        .hud-coords .val { color:var(--accent); transition: color 0.4s; text-shadow: 0 0 8px var(--text-glow); }
+
+        .hud-br { position:absolute; bottom:35px; right:35px; text-align:right; }
+        .hud-frame { font-size:8px; letter-spacing:2px; color:var(--muted); }
+        .hud-frame .val { color:var(--fg); }
+
+        .hud-center-bottom { position:absolute; bottom:26px; left:50%; transform:translateX(-50%); }
+        .hud-hint {
+            font-size:7px; letter-spacing:3px; color:var(--muted);
+            text-transform:uppercase; animation: breathe 4s ease-in-out infinite;
+        }
+        @keyframes breathe { 0%,100%{opacity:0.2} 50%{opacity:0.65} }
+
+        .panel {
+            position:fixed; left:50%; bottom:60px; z-index:20;
+            transform:translateX(-50%);
+            display:flex; align-items:center; gap:8px;
+            background:var(--card); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+            border:1px solid var(--border); border-radius:20px; padding:10px 16px;
+            box-shadow:var(--shadow); pointer-events:all;
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .panel.hidden { opacity:0; transform:translateX(-50%) translateY(30px); pointer-events:none; }
+        .panel .sep { width:1px; height:32px; background:var(--border); margin:0 6px; flex-shrink:0; }
+
+        .btn {
+            display:flex; align-items:center; justify-content:center;
+            width:42px; height:42px; border-radius:14px;
+            border:1px solid transparent; background:rgba(255,255,255,0.03); color:var(--fg);
+            cursor:pointer; transition:all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            font-family: var(--font-mono); font-size:10px; font-weight:700;
+            position:relative; overflow:hidden;
+        }
+        .btn:hover { background:rgba(255,255,255,0.08); border-color:var(--border); transform: translateY(-2px); }
+        .btn:active { transform:scale(0.9); }
+        .btn.active { background:var(--btn-active-bg); color:var(--btn-active-fg); border-color:var(--btn-active-bg); box-shadow: 0 0 15px var(--border-glow); }
+        .btn.active:hover { filter:brightness(1.1); transform: translateY(-2px); }
+        .btn .material-symbols-rounded { font-size:22px; }
+        .btn-label {
+            position:absolute; bottom:2px; left:50%; transform:translateX(-50%);
+            font-size:6px; font-weight: 400; letter-spacing:1px; color:var(--muted);
+            white-space:nowrap; opacity:0; transition:opacity 0.2s; pointer-events:none;
+        }
+        .btn:hover .btn-label { opacity:1; }
+
+        .side-panel {
+            position:fixed; right:20px; top:50%; transform:translateY(-50%);
+            z-index:20; display:flex; flex-direction:column; gap:6px; pointer-events:all;
+        }
+        .color-btn {
+            width:22px; height:22px; border-radius:50%;
+            border:2px solid transparent; cursor:pointer;
+            transition:all 0.2s ease; box-shadow:0 1px 6px rgba(0,0,0,0.08);
+        }
+        .color-btn:hover { transform:scale(1.2); }
+        .color-btn.active { border-color:var(--fg); transform:scale(1.15); }
+
+        .slider-wrap { display:flex; align-items:center; gap:6px; padding:0 4px; }
+        .slider-wrap label { font-size:6px; letter-spacing:1px; color:var(--muted); white-space:nowrap; }
+        input[type="range"] {
+            -webkit-appearance:none; appearance:none;
+            width:60px; height:3px; background:var(--border);
+            border-radius:2px; outline:none; cursor:pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance:none; appearance:none;
+            width:12px; height:12px; border-radius:50%;
+            background:var(--thumb-bg); border:2px solid var(--thumb-border);
+            box-shadow:0 1px 4px rgba(0,0,0,0.12); transition: background 0.3s;
+        }
+
+        .click-ring {
+            position:fixed; width:30px; height:30px;
+            border:2px solid var(--accent); border-radius:50%;
+            pointer-events:none; z-index:11;
+            transform:translate(-50%,-50%) scale(0); opacity:0;
+            transition: border-color 0.4s;
+            box-shadow: 0 0 15px var(--accent);
+        }
+        .click-ring.active { animation:ringPulse 0.6s ease-out forwards; }
+        @keyframes ringPulse {
+            0%   { transform:translate(-50%,-50%) scale(0); opacity:0.4; }
+            100% { transform:translate(-50%,-50%) scale(5); opacity:0; }
+        }
+
+        .toast {
+            position:fixed; top:24px; left:50%; transform:translateX(-50%) translateY(-60px);
+            z-index:30; background:var(--card); backdrop-filter:blur(12px);
+            border:1px solid var(--border); border-radius:10px;
+            padding:8px 18px; font-size:8px; letter-spacing:2px;
+            color:var(--fg); box-shadow:var(--shadow);
+            transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+            opacity:0; pointer-events:none;
+        }
+        .toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+
+        .loading {
+            position:fixed; inset:0; background:var(--bg); z-index:100;
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            transition:opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1), visibility 1.2s;
+        }
+        .loading.hidden { opacity:0; visibility:hidden; }
+        .loading-text { font-family: var(--font-mono); font-size:12px; font-weight: 700; letter-spacing:8px; color:var(--accent); text-transform:uppercase; margin-bottom:24px; transition: color 0.4s; text-shadow: 0 0 15px var(--text-glow); }
+        .loading-bar { width:240px; height:2px; background:var(--border); position:relative; overflow:hidden; border-radius: 1px; }
+        .loading-bar-fill { position:absolute; top:0;left:0;height:100%;background:var(--accent);width:0%;transition:width 0.3s ease, background 0.4s; box-shadow: 0 0 10px var(--accent); }
+        .loading-pct { font-family: var(--font-mono); margin-top:16px; font-size:9px; letter-spacing:4px; color:var(--muted); }
+
+        @media (prefers-reduced-motion:reduce) {
+            .hud-title .dot, .hud-hint { animation:none; }
+            .hud-hint { opacity:0.4; }
+        }
+        @media (max-width:700px) {
+            .panel { bottom:60px; padding:6px 8px; gap:4px; }
+            .btn { width:34px; height:34px; }
+            .side-panel { right:10px; }
+            .slider-wrap { display:none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="loading" id="loading">
+        <div class="loading-text">Initializing</div>
+        <div class="loading-bar"><div class="loading-bar-fill" id="loading-fill"></div></div>
+        <div class="loading-pct" id="loading-pct">0%</div>
+    </div>
+
+    <div class="color-wash" id="color-wash"></div>
+    <div id="canvas-container"></div>
+    <div class="vignette"></div>
+    <div class="noise"></div>
+    <div class="click-ring" id="click-ring"></div>
+    <div class="toast" id="toast"></div>
+
+    <div class="hud">
+        <div class="hud-corner tl"></div>
+        <div class="hud-corner tr"></div>
+        <div class="hud-corner bl"></div>
+        <div class="hud-corner br"></div>
+        <div class="hud-tl">
+            <div class="hud-title"><span class="dot"></span>NEXUS // ACTIVE</div>
+            <div class="hud-subtitle">Spatial Interface v0.8.0</div>
+        </div>
+        <div class="hud-tr">
+            <button class="btn" id="btn-theme" style="width:32px; height:32px; margin-bottom:10px; pointer-events:all;" title="Toggle Theme">
+                <span class="material-symbols-rounded">dark_mode</span>
+            </button>
+            <div class="hud-stat">FPS <span class="val" id="fps">60</span></div>
+            <div class="hud-stat">VERTICES <span class="val" id="verts">&mdash;</span></div>
+            <div class="hud-stat">UPTIME <span class="val" id="uptime">00:00</span></div>
+        </div>
+        <div class="hud-bl">
+            <div class="hud-coords">X <span class="val" id="cx">0.000</span> &nbsp; Y <span class="val" id="cy">0.000</span></div>
+        </div>
+        <div class="hud-br">
+            <div class="hud-frame">FRAME <span class="val" id="frame">0000</span></div>
+        </div>
+        <div class="hud-center-bottom">
+            <div class="hud-hint">Drag to rotate &middot; Scroll to zoom &middot; Click to pulse</div>
+        </div>
+    </div>
+
+    <div class="panel hidden" id="panel">
+        <button class="btn active" id="btn-rotate" title="Auto Rotate">
+            <span class="material-symbols-rounded">360</span>
+            <span class="btn-label">ROTATE</span>
+        </button>
+        <button class="btn" id="btn-wire" title="Wireframe">
+            <span class="material-symbols-rounded">grid_3x3</span>
+            <span class="btn-label">WIRE</span>
+        </button>
+        <button class="btn" id="btn-explode" title="Explode">
+            <span class="material-symbols-rounded">open_with</span>
+            <span class="btn-label">EXPLODE</span>
+        </button>
+        <button class="btn" id="btn-drop" title="Gravity Drop">
+            <span class="material-symbols-rounded">arrow_drop_down</span>
+            <span class="btn-label">DROP</span>
+        </button>
+        <button class="btn" id="btn-burst" title="Particle Burst">
+            <span class="material-symbols-rounded">blur_on</span>
+            <span class="btn-label">BURST</span>
+        </button>
+        <button class="btn" id="btn-spin" title="Hyper Spin">
+            <span class="material-symbols-rounded">autorenew</span>
+            <span class="btn-label">SPIN</span>
+        </button>
+        <div class="sep"></div>
+        <div class="slider-wrap">
+            <label>SPEED</label>
+            <input type="range" id="speed-slider" min="0" max="200" value="100">
+        </div>
+        <div class="sep"></div>
+        <button class="btn active" id="btn-shadow" title="Toggle Shadow">
+            <span class="material-symbols-rounded">wb_sunny</span>
+            <span class="btn-label">SHADOW</span>
+        </button>
+    </div>
+
+    <div class="side-panel" id="side-panel">
+        <div class="color-btn active" data-color="#00f2ff" style="background:#00f2ff;" title="Cyber Cyan"></div>
+        <div class="color-btn" data-color="#ff007a" style="background:#ff007a;" title="Neon Pink"></div>
+        <div class="color-btn" data-color="#00ff9f" style="background:#00ff9f;" title="Matrix Green"></div>
+        <div class="color-btn" data-color="#7000ff" style="background:#7000ff;" title="Electric Violet"></div>
+        <div class="color-btn" data-color="#ffae00" style="background:#ffae00;" title="Atomic Orange"></div>
+        <div class="color-btn" data-color="#ffffff" style="background:#ffffff;" title="Pure White"></div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.152.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.152.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        /* ──────── Scene ──────── */
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050508);
+        scene.fog = new THREE.FogExp2(0x050508, 0.015);
+        scene.environment = new THREE.Color(0x444444); // Fixed environment for consistent reflections
+
+        const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 1000);
+        camera.position.set(0, 1, 5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        /* ──────── Controls ──────── */
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.04;
+        controls.enablePan = false;
+        controls.minDistance = 2;
+        controls.maxDistance = 10;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 1.0;
+        controls.target.set(0, 0.15, 0);
+
+        /* ──────── Lighting ──────── */
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 3);
+        mainLight.position.set(5, 10, 7.5);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        mainLight.shadow.camera.near = 0.5;
+        mainLight.shadow.camera.far = 30;
+        mainLight.shadow.camera.left = -5;
+        mainLight.shadow.camera.right = 5;
+        mainLight.shadow.camera.top = 5;
+        mainLight.shadow.camera.bottom = -5;
+        mainLight.shadow.radius = 8;
+        mainLight.shadow.bias = -0.0001;
+        scene.add(mainLight);
+
+        const rimLight = new THREE.PointLight(0x00f2ff, 2, 15);
+        rimLight.position.set(-5, 2, -5);
+        scene.add(rimLight);
+
+        const accentLight = new THREE.PointLight(0x00f2ff, 1.5, 12);
+        accentLight.position.set(2, 1, 2);
+        scene.add(accentLight);
+
+        /* ──────── Shadow floor ──────── */
+        const floorMat = new THREE.ShadowMaterial({ opacity: 0.08 });
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -0.65;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        let shadowOn = true;
+
+        /* ──────── Star particles ──────── */
+        const PCOUNT = 2500;
+        const pGeo = new THREE.BufferGeometry();
+        const pPos = new Float32Array(PCOUNT * 3);
+        const pSizes = new Float32Array(PCOUNT);
+        for (let i = 0; i < PCOUNT; i++) {
+            pPos[i * 3]     = (Math.random() - 0.5) * 40;
+            pPos[i * 3 + 1] = (Math.random() - 0.5) * 40;
+            pPos[i * 3 + 2] = (Math.random() - 0.5) * 40;
+            pSizes[i] = Math.random();
+        }
+        pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+        pGeo.setAttribute('size', new THREE.BufferAttribute(pSizes, 1));
+        const pMat = new THREE.PointsMaterial({ size: 0.05, color: 0xffffff, transparent: true, opacity: 0.4, sizeAttenuation: true });
+        const particles = new THREE.Points(pGeo, pMat);
+        scene.add(particles);
+
+        /* ──────── Burst particles ──────── */
+        const BCOUNT = 800;
+        const bGeo = new THREE.BufferGeometry();
+        const bPos = new Float32Array(BCOUNT * 3);
+        const bVel = new Float32Array(BCOUNT * 3);
+        const bLife = new Float32Array(BCOUNT);
+        bGeo.setAttribute('position', new THREE.BufferAttribute(bPos, 3));
+        const bMat = new THREE.PointsMaterial({
+            color: 0x00f2ff, size: 0.04, sizeAttenuation: true,
+            transparent: true, opacity: 0, blending: THREE.AdditiveBlending
+        });
+        const burstParticles = new THREE.Points(bGeo, bMat);
+        scene.add(burstParticles);
+        let burstActive = false;
+        let burstTimer = 0;
+
+        function triggerBurst() {
+            const posArr = bGeo.attributes.position.array;
+            for (let i = 0; i < BCOUNT; i++) {
+                posArr[i * 3]     = 0;
+                posArr[i * 3 + 1] = 0.15;
+                posArr[i * 3 + 2] = 0;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                const sp = 2.0 + Math.random() * 4.0;
+                bVel[i * 3]     = Math.sin(phi) * Math.cos(theta) * sp;
+                bVel[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * sp;
+                bVel[i * 3 + 2] = Math.cos(phi) * sp;
+                bLife[i] = 1.0;
+            }
+            bGeo.attributes.position.needsUpdate = true;
+            bMat.opacity = 0.8;
+            burstActive = true;
+            burstTimer = 0;
+        }
+
+        /* ──────── Load GLB ──────── */
+        let mainModel = null;
+        let modelMeshes = [];
+        const modelYRest = 0.15;
+        const loadingFill = document.getElementById('loading-fill');
+        const loadingPct  = document.getElementById('loading-pct');
+        const loadingEl   = document.getElementById('loading');
+
+        let fakeProg = 0;
+        const loadingText = document.getElementById('loading').querySelector('.loading-text');
+        const phrases = ["Initializing", "Loading Assets", "Calibrating Neural Map", "Establishing Nexus Link", "Ready"];
+        let phraseIdx = 0;
+
+        const fakeInt = setInterval(() => {
+            fakeProg = Math.min(fakeProg + Math.random() * 8, 92);
+            loadingFill.style.width = fakeProg + '%';
+            loadingPct.textContent  = Math.floor(fakeProg) + '%';
+            
+            if (fakeProg > (phraseIdx + 1) * 20 && phraseIdx < phrases.length - 2) {
+                phraseIdx++;
+                loadingText.textContent = phrases[phraseIdx];
+            }
+        }, 150);
+
+        function onModelReady(vertCount) {
+            clearInterval(fakeInt);
+            loadingFill.style.width = '100%';
+            loadingPct.textContent  = '100%';
+            document.getElementById('verts').textContent = vertCount.toLocaleString();
+            setTimeout(() => loadingEl.classList.add('hidden'), 500);
+            setTimeout(() => document.getElementById('panel').classList.remove('hidden'), 800);
+        }
+
+        const loader = new GLTFLoader();
+        loader.load(
+            'https://threejs.org/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf',
+            (gltf) => {
+                mainModel = gltf.scene;
+                mainModel.scale.set(1.8, 1.8, 1.8);
+                mainModel.position.y = modelYRest;
+                mainModel.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material.envMapIntensity = 1.5;
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        modelMeshes.push(child);
+                    }
+                });
+                scene.add(mainModel);
+                let vc = 0;
+                mainModel.traverse(c => { if (c.isMesh && c.geometry) vc += c.geometry.attributes.position.count; });
+                onModelReady(vc);
+            },
+            (p) => { if (p.total > 0) fakeProg = Math.min((p.loaded / p.total) * 88, 88); },
+            () => {
+                clearInterval(fakeInt);
+                const g = new THREE.Group();
+                const core = new THREE.Mesh(
+                    new THREE.IcosahedronGeometry(0.75, 2),
+                    new THREE.MeshStandardMaterial({ 
+                        color: 0x1a1a2e, 
+                        metalness: 0.9, 
+                        roughness: 0.1,
+                        emissive: 0x00f2ff,
+                        emissiveIntensity: 0.1,
+                        envMapIntensity: 1.5
+                    })
+                );
+                core.castShadow = true;
+                g.add(core);
+                const shell = new THREE.Mesh(
+                    new THREE.IcosahedronGeometry(0.85, 1),
+                    new THREE.MeshBasicMaterial({ color: 0x00f2ff, wireframe: true, transparent: true, opacity: 0.2 })
+                );
+                g.add(shell);
+                g.scale.set(1.8, 1.8, 1.8);
+                g.position.y = modelYRest;
+                mainModel = g;
+                modelMeshes = [core, shell];
+                scene.add(mainModel);
+                let vc = 0;
+                g.traverse(c => { if (c.isMesh && c.geometry) vc += c.geometry.attributes.position.count; });
+                onModelReady(vc);
+            }
+        );
+
+        /* ──────── State ──────── */
+        let wireMode = false;
+        let explodeActive = false;
+        let explodeProgress = 0;
+        let dropActive = false;
+        let dropVelocity = 0;
+        let dropCurrentY = modelYRest;
+        let hyperSpin = false;
+        let hyperSpinSpeed = 0;
+        let accentHex = '#00f2ff';
+
+        /* ──────── Toast ──────── */
+        const toastEl = document.getElementById('toast');
+        let toastTimer = null;
+        function showToast(msg) {
+            toastEl.textContent = msg;
+            toastEl.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+        }
+
+        /* ──────── Theme Toggle ──────── */
+        const btnTheme = document.getElementById('btn-theme');
+        let currentTheme = 'dark';
+
+        function toggleTheme() {
+            currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', currentTheme);
+            btnTheme.querySelector('span').textContent = currentTheme === 'dark' ? 'dark_mode' : 'light_mode';
+            
+            const bgColor = currentTheme === 'dark' ? 0x050508 : 0xf8f8fb;
+            scene.background.set(bgColor);
+            scene.fog.color.set(bgColor);
+            
+            // Keep the model environment neutral to maintain visibility
+            // scene.environment is already fixed to 0x444444
+            
+            // Update particles color
+            pMat.color.set(currentTheme === 'dark' ? 0xffffff : 0x000000);
+            pMat.opacity = currentTheme === 'dark' ? 0.4 : 0.15;
+            
+            // Update accent properties for the current theme
+            const savedAccent = localStorage.getItem('custom-accent');
+            const defaultAccents = { dark: '#00f2ff', light: '#00896b' };
+            const activeAccent = savedAccent || defaultAccents[currentTheme];
+            
+            updateAccentColor(activeAccent);
+            
+            // Update active color button
+            document.querySelectorAll('.color-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.color === activeAccent);
+            });
+            
+            showToast(`THEME: ${currentTheme.toUpperCase()}`);
+        }
+
+        btnTheme.addEventListener('click', toggleTheme);
+
+        /* ──────── Color wash ──────── */
+        const colorWash = document.getElementById('color-wash');
+        function updateAccentColor(hex) {
+            accentHex = hex;
+            accentLight.color.set(hex);
+            rimLight.color.set(hex);
+            bMat.color.set(hex);
+            document.documentElement.style.setProperty('--accent', hex);
+            document.documentElement.style.setProperty('--border-glow', hex + '4d');
+            document.documentElement.style.setProperty('--text-glow', currentTheme === 'dark' ? hex + '66' : 'transparent');
+            if (currentTheme === 'dark') {
+                document.documentElement.style.setProperty('--thumb-bg', hex);
+                document.documentElement.style.setProperty('--btn-active-bg', hex);
+            } else {
+                document.documentElement.style.setProperty('--thumb-bg', '#000');
+            }
+            colorWash.style.background = `radial-gradient(circle at 50% 50%, ${hex} 0%, transparent 70%)`;
+            colorWash.classList.add('pulse');
+            setTimeout(() => colorWash.classList.remove('pulse'), 800);
+        }
+
+        /* ──────── Click ripple ──────── */
+        const clickRing = document.getElementById('click-ring');
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.panel') || e.target.closest('.side-panel')) return;
+            clickRing.style.left = e.clientX + 'px';
+            clickRing.style.top  = e.clientY + 'px';
+            clickRing.classList.remove('active');
+            void clickRing.offsetWidth;
+            clickRing.classList.add('active');
+        });
+
+        /* ──────── Buttons ──────── */
+        const btnRotate = document.getElementById('btn-rotate');
+        btnRotate.addEventListener('click', () => {
+            controls.autoRotate = !controls.autoRotate;
+            btnRotate.classList.toggle('active', controls.autoRotate);
+            showToast(controls.autoRotate ? 'AUTO ROTATE ON' : 'AUTO ROTATE OFF');
+        });
+
+        const btnWire = document.getElementById('btn-wire');
+        btnWire.addEventListener('click', () => {
+            wireMode = !wireMode;
+            btnWire.classList.toggle('active', wireMode);
+            modelMeshes.forEach(m => { if (m.material) m.material.wireframe = wireMode; });
+            showToast(wireMode ? 'WIREFRAME ON' : 'WIREFRAME OFF');
+        });
+
+        const btnExplode = document.getElementById('btn-explode');
+        btnExplode.addEventListener('click', () => {
+            explodeActive = !explodeActive;
+            btnExplode.classList.toggle('active', explodeActive);
+            showToast(explodeActive ? 'EXPLODE ON' : 'EXPLODE OFF');
+        });
+
+        const btnDrop = document.getElementById('btn-drop');
+        btnDrop.addEventListener('click', () => {
+            dropActive = !dropActive;
+            btnDrop.classList.toggle('active', dropActive);
+            if (dropActive) {
+                dropVelocity = 0;
+                dropCurrentY = mainModel ? mainModel.position.y : modelYRest;
+            }
+            showToast(dropActive ? 'GRAVITY DROP ON' : 'GRAVITY DROP OFF');
+        });
+
+        const btnBurst = document.getElementById('btn-burst');
+        btnBurst.addEventListener('click', () => {
+            triggerBurst();
+            colorWash.classList.add('pulse');
+            setTimeout(() => colorWash.classList.remove('pulse'), 500);
+            showToast('PARTICLE BURST');
+        });
+
+        const btnSpin = document.getElementById('btn-spin');
+        btnSpin.addEventListener('click', () => {
+            hyperSpin = !hyperSpin;
+            btnSpin.classList.toggle('active', hyperSpin);
+            showToast(hyperSpin ? 'HYPER SPIN ON' : 'HYPER SPIN OFF');
+        });
+
+        const btnShadow = document.getElementById('btn-shadow');
+        btnShadow.addEventListener('click', () => {
+            shadowOn = !shadowOn;
+            btnShadow.classList.toggle('active', shadowOn);
+            renderer.shadowMap.enabled = shadowOn;
+            floor.visible = shadowOn;
+            scene.traverse(c => { if (c.material) c.material.needsUpdate = true; });
+            showToast(shadowOn ? 'SHADOW ON' : 'SHADOW OFF');
+        });
+
+        const speedSlider = document.getElementById('speed-slider');
+        speedSlider.addEventListener('input', () => {
+            controls.autoRotateSpeed = parseFloat(speedSlider.value) / 100;
+        });
+
+        /* ──────── Color picker ──────── */
+        const colorBtns = document.querySelectorAll('.color-btn');
+        colorBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                colorBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                updateAccentColor(btn.dataset.color);
+                localStorage.setItem('custom-accent', btn.dataset.color);
+                showToast('ACCENT UPDATED');
+            });
+        });
+
+        /* ──────── Mouse ──────── */
+        let mx = 0, my = 0;
+        document.addEventListener('mousemove', (e) => {
+            mx = (e.clientX / innerWidth  - 0.5) * 2;
+            my = (e.clientY / innerHeight - 0.5) * 2;
+            document.getElementById('cx').textContent = mx.toFixed(3);
+            document.getElementById('cy').textContent = (-my).toFixed(3);
+        });
+
+        /* ──────── HUD ──────── */
+        let frameN = 0, startTime = Date.now(), fpsBucket = 0, lastFpsT = Date.now(), curFps = 60;
+
+        /* ──────── Render loop ──────── */
+        let lastTime = performance.now();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const nowMs = performance.now();
+            const dt = Math.min((nowMs - lastTime) / 1000, 0.1);
+            lastTime = nowMs;
+            const t = nowMs * 0.001;
+
+            // FPS
+            fpsBucket++;
+            const dateNow = Date.now();
+            if (dateNow - lastFpsT >= 1000) {
+                curFps = fpsBucket; fpsBucket = 0; lastFpsT = dateNow;
+                document.getElementById('fps').textContent = curFps;
+            }
+            frameN++;
+            document.getElementById('frame').textContent = String(frameN).padStart(4, '0');
+            const us = Math.floor((dateNow - startTime) / 1000);
+            document.getElementById('uptime').textContent =
+                String(Math.floor(us / 60)).padStart(2, '0') + ':' + String(us % 60).padStart(2, '0');
+
+            // Stars drift
+            particles.rotation.y += 0.001;
+            particles.position.y = Math.sin(t * 0.5) * 0.5;
+
+            // Burst particles
+            if (burstActive) {
+                burstTimer += dt;
+                const posArr = bGeo.attributes.position.array;
+                let alive = 0;
+                for (let i = 0; i < BCOUNT; i++) {
+                    if (bLife[i] <= 0) continue;
+                    bLife[i] -= dt * 0.55;
+                    if (bLife[i] <= 0) {
+                        bLife[i] = 0;
+                        posArr[i * 3 + 1] = -100;
+                        continue;
+                    }
+                    alive++;
+                    posArr[i * 3]     += bVel[i * 3]     * dt;
+                    posArr[i * 3 + 1] += bVel[i * 3 + 1] * dt;
+                    posArr[i * 3 + 2] += bVel[i * 3 + 2] * dt;
+                    bVel[i * 3]     *= (1 - 1.5 * dt);
+                    bVel[i * 3 + 1] *= (1 - 1.5 * dt);
+                    bVel[i * 3 + 2] *= (1 - 1.5 * dt);
+                    bVel[i * 3 + 1] -= 2.0 * dt;
+                }
+                bGeo.attributes.position.needsUpdate = true;
+                bMat.opacity = Math.max(0, 0.8 - burstTimer * 0.35);
+                if (alive === 0 || burstTimer > 3.0) {
+                    burstActive = false;
+                    bMat.opacity = 0;
+                }
+            }
+            // Model animations
+            if (mainModel) {
+                // Explode
+                if (explodeActive) {
+                    explodeProgress = Math.min(explodeProgress + dt * 2.0, 1);
+                } else {
+                    explodeProgress = Math.max(explodeProgress - dt * 2.0, 0);
+                }
+                const es = 1 + explodeProgress * 0.6;
+                mainModel.scale.set(1.8 * es, 1.8 * es, 1.8 * es);
+
+                // Gravity drop — only when toggled on
+                if (dropActive) {
+                    dropVelocity += 15.0 * dt;
+                    dropCurrentY -= dropVelocity * dt;
+                    if (dropCurrentY <= -0.6) {
+                        dropCurrentY = -0.6;
+                        dropVelocity = -dropVelocity * 0.45;
+                        if (Math.abs(dropVelocity) < 2.5) {
+                            dropVelocity = -5.5;
+                        }
+                    }
+                    mainModel.position.y = dropCurrentY;
+                } else {
+                    // Stationary — stays put
+                    mainModel.position.y = modelYRest;
+                }
+
+                // Hyper spin
+                if (hyperSpin) {
+                    hyperSpinSpeed = Math.min(hyperSpinSpeed + dt * 5.0, 8.0);
+                } else {
+                    hyperSpinSpeed = Math.max(hyperSpinSpeed - dt * 4.0, 0);
+                }
+                if (hyperSpinSpeed > 0.01) {
+                    mainModel.rotation.y += hyperSpinSpeed * dt;
+                }
+            }
+
+            // Accent light follows mouse
+            accentLight.position.x = 2 + mx * 0.8;
+            accentLight.position.y = 1 - my * 0.5;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        addEventListener('resize', () => {
+            camera.aspect = innerWidth / innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(innerWidth, innerHeight);
+        });
+    </script>
+</body>
+</html>
