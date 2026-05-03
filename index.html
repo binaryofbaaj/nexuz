@@ -282,9 +282,9 @@
             <span class="material-symbols-rounded">open_with</span>
             <span class="btn-label">EXPLODE</span>
         </button>
-        <button class="btn" id="btn-drop" title="Gravity Drop">
-            <span class="material-symbols-rounded">arrow_drop_down</span>
-            <span class="btn-label">DROP</span>
+        <button class="btn" id="btn-drop" title="Bounce">
+            <span class="material-symbols-rounded">keyboard_arrow_down</span>
+            <span class="btn-label">BOUNCE</span>
         </button>
         <button class="btn" id="btn-burst" title="Particle Burst">
             <span class="material-symbols-rounded">blur_on</span>
@@ -663,7 +663,7 @@
                 dropVelocity = 0;
                 dropCurrentY = mainModel ? mainModel.position.y : modelYRest;
             }
-            showToast(dropActive ? 'GRAVITY DROP ON' : 'GRAVITY DROP OFF');
+            showToast(dropActive ? 'BOUNCE ON' : 'BOUNCE OFF');
         });
 
         const btnBurst = document.getElementById('btn-burst');

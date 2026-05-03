@@ -11,7 +11,7 @@
 - **Interactive 3D**: 
   - **Auto-Rotate**: Smooth 360-degree model rotation.
   - **Explode**: Deconstruct model meshes for internal inspection.
-  - **Gravity Drop**: Physics-inspired drop and bounce animation.
+  - **Bounce**: Physics-inspired drop and bounce animation.
   - **Hyper Spin**: High-velocity rotational bursts.
   - **Particle Burst**: Sonar-style particle emission.
 - **Tactical HUD**: Real-time telemetry including FPS tracking, vertex counts, and spatial coordinates.
@@ -38,7 +38,7 @@ Simply open `index.html` in any modern web browser.
 - **ROTATE**: Toggle automatic rotation.
 - **WIRE**: Toggle mesh wireframe mode.
 - **EXPLODE**: Expand/contract the model's component meshes.
-- **DROP**: Trigger the gravity physics simulation.
+- **BOUNCE**: Trigger the gravity physics simulation.
 - **BURST**: Emit a burst of particles from the center.
 - **SPIN**: Increase rotational velocity to hyper-speeds.
 - **SHADOW**: Toggle high-quality soft shadows.
